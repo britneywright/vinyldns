@@ -33,11 +33,11 @@ before_cache:
 jobs:
   include:
     - stage: "Verify core and API modules"
-      script: sbt ++$TRAVIS_SCALA_VERSION ";validate-api; validate-core"
-      name: "Validate and verify API"
-      
+      script: ./bin/func-test-portal.sh
+      name: "Run portal functional tests"
+
 after_success:
   - bash <(curl -s https://codecov.io/bash)
-  - if ["$TRAVIS_BRANCH" = "master" -a "$TRAVIS_PULL_REQUEST" = "false"]; then
+  - if [ "$TRAVIS_BRANCH" = "master" -a "$TRAVIS_PULL_REQUEST" = "false" ]; then
       sbt 'project docs' 'publishMicrosite';
     fi
