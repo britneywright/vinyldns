@@ -77,13 +77,29 @@ object AccessValidations extends AccessValidationAlgebra {
 
   def canViewRecordSet(
       auth: AuthPrincipal,
-      recordName: String,
-      recordType: RecordType,
+      recordSet: RecordSet,
       zone: Zone): Either[Throwable, Unit] =
     ensuring(
       NotAuthorizedError(s"User ${auth.signedInUser.userName} does not have access to view " +
-        s"$recordName.${zone.name}"))(
-      getAccessLevel(auth, recordName, recordType, zone) != AccessLevel.NoAccess)
+        s"${recordSet.name}.${zone.name}"))(
+      getAccessLevel(auth, recordSet, zone) != AccessLevel.NoAccess)
+
+//  def canViewRecordSet(
+//      auth: AuthPrincipal,
+//      recordSet: RecordSet,
+//      zone: Zone): Either[Throwable, Unit] =
+//    recordSet.ownerGroupId match {
+//      case Some(_) =>
+//        ensuring(
+//          NotAuthorizedError(s"User ${auth.signedInUser.userName} does not have access to view " +
+//            s"${recordSet.name}.${zone.name}"))(
+//          getSharedAccessLevel(auth, recordSet, zone) != AccessLevel.NoAccess)
+//      case None =>
+//        ensuring(
+//          NotAuthorizedError(s"User ${auth.signedInUser.userName} does not have access to view " +
+//            s"${recordSet.name}.${zone.name}"))(
+//          getAccessLevel(auth, recordSet.name, recordSet.typ, zone) != AccessLevel.NoAccess)
+//    }
 
   def getListAccessLevels(
       auth: AuthPrincipal,
@@ -173,16 +189,29 @@ object AccessValidations extends AccessValidationAlgebra {
       topRule.accessLevel
     }
 
-  def getAccessLevel(
-      auth: AuthPrincipal,
-      recordName: String,
-      recordType: RecordType,
-      zone: Zone): AccessLevel = auth match {
-    case admin if admin.canEditAll || admin.isGroupMember(zone.adminGroupId) => AccessLevel.Delete
-    case supportUser if supportUser.canReadAll => {
-      val aclAccess = getAccessFromAcl(auth, recordName, recordType, zone)
-      if (aclAccess == AccessLevel.NoAccess) AccessLevel.Read else aclAccess
+//  def getAccessLevel(
+//      auth: AuthPrincipal,
+//      recordName: String,
+//      recordType: RecordType,
+//      zone: Zone): AccessLevel = auth match {
+//    case admin if admin.canEditAll || admin.isGroupMember(zone.adminGroupId) => AccessLevel.Delete
+//    case supportUser if supportUser.canReadAll => {
+//      val aclAccess = getAccessFromAcl(auth, recordName, recordType, zone)
+//      if (aclAccess == AccessLevel.NoAccess) AccessLevel.Read else aclAccess
+//    }
+//    case _ => getAccessFromAcl(auth, recordName, recordType, zone)
+//  }
+
+  def getAccessLevel(auth: AuthPrincipal, recordSet: RecordSet, zone: Zone): AccessLevel =
+    auth match {
+      case admin
+          if admin.canEditAll || admin.isGroupMember(zone.adminGroupId) ||
+            admin.isGroupMember(recordSet.ownerGroupId.mkString) =>
+        AccessLevel.Delete
+      case supportUser if supportUser.canReadAll => {
+        val aclAccess = getAccessFromAcl(auth, recordSet.name, recordSet.typ, zone)
+        if (aclAccess == AccessLevel.NoAccess) AccessLevel.Read else aclAccess
+      }
+      case _ => getAccessFromAcl(auth, recordSet.name, recordSet.typ, zone)
     }
-    case _ => getAccessFromAcl(auth, recordName, recordType, zone)
-  }
 }

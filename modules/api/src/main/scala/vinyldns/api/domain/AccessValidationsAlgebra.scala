@@ -48,8 +48,7 @@ trait AccessValidationAlgebra {
 
   def canViewRecordSet(
       auth: AuthPrincipal,
-      recordName: String,
-      recordType: RecordType,
+      recordSet: RecordSet,
       zone: Zone): Either[Throwable, Unit]
 
   def getListAccessLevels(

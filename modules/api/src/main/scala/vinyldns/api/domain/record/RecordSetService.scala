@@ -116,7 +116,7 @@ class RecordSetService(
     for {
       zone <- getZone(zoneId)
       recordSet <- getRecordSet(recordSetId, zone)
-      _ <- canViewRecordSet(authPrincipal, recordSet.name, recordSet.typ, zone).toResult
+      _ <- canViewRecordSet(authPrincipal, recordSet, zone).toResult
     } yield recordSet
 
   def listRecordSets(
