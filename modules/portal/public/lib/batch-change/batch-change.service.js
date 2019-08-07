@@ -25,8 +25,11 @@
                 return $http.get(url);
             };
 
-            this.createBatchChange = function (data) {
-                var url = '/api/batchchanges';
+            this.createBatchChange = function (data, allowManualReview) {
+                var params = {
+                    "allowManualReview": allowManualReview
+                }
+                var url = utilityService.urlBuilder('/api/batchchanges', params);
                 return $http.post(url, data, {headers: utilityService.getCsrfHeader()});
             };
 
