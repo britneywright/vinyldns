@@ -1799,7 +1799,7 @@ class BatchChangeServiceSpec
     }
   }
 
-  "buildResponseForApprover" should {
+  "rebuildBatchChangeForUpdate" should {
     val batchChangeNeedsApproval = BatchChange(
       auth.userId,
       auth.signedInUser.userName,
@@ -1817,7 +1817,7 @@ class BatchChangeServiceSpec
     "return a BatchChange if all data inputs are valid" in {
       val result = rightResultOf(
         underTestManualEnabled
-          .buildResponseForApprover(
+          .rebuildBatchChangeForUpdate(
             batchChangeNeedsApproval,
             List(
               AddChangeForValidation(
@@ -1838,7 +1838,7 @@ class BatchChangeServiceSpec
     "return a BatchChange with current failures if any data is invalid" in {
       val result = rightResultOf(
         underTestManualEnabled
-          .buildResponseForApprover(
+          .rebuildBatchChangeForUpdate(
             batchChangeNeedsApproval,
             List(
               AddChangeForValidation(
@@ -2265,19 +2265,8 @@ class BatchChangeServiceSpec
     }
   }
 
-  "getApprovalResult" should {
+  "buildResponseForApprover" should {
     "return batch change has ManuallyApproved approval status" in {
-      val existingBatchChange =
-        BatchChange(
-          auth.userId,
-          auth.signedInUser.userName,
-          Some("comments in"),
-          DateTime.now.minusDays(1),
-          List(singleChangeGood, singleChangeNR),
-          Some(authGrp.id),
-          approvalStatus = BatchChangeApprovalStatus.PendingReview
-        )
-
       val updatedBatchChange = BatchChange(
         auth.userId,
         auth.signedInUser.userName,
@@ -2291,21 +2280,7 @@ class BatchChangeServiceSpec
         Some(DateTime.now)
       )
 
-      val batchChangeInput = BatchChangeInput(existingBatchChange)
-
-      val changeInputs = batchChangeInput.changes.collect {
-        case a: AddChangeInput => a
-      }
-
-      val transformed = List(
-        AddChangeForValidation(
-          baseZone,
-          singleChangeGood.inputName.split('.').head,
-          changeInputs.head).validNel,
-        AddChangeForValidation(baseZone, singleChangeNR.inputName.split('.').head, changeInputs(1)).validNel
-      )
-
-      val result = underTest.getApprovalResult(updatedBatchChange, transformed).right.value
+      val result = underTest.buildResponseForApprover(updatedBatchChange).right.value
 
       result shouldBe a[BatchChange]
     }
@@ -2320,30 +2295,9 @@ class BatchChangeServiceSpec
           approvalStatus = BatchChangeApprovalStatus.PendingReview
         )
 
-      val batchChangeNeedsApproval = BatchChange(
-        auth.userId,
-        auth.signedInUser.userName,
-        Some("check approval status"),
-        DateTime.now,
-        List(singleChangeGood, singleChangeNR),
-        Some(authGrp.id),
-        BatchChangeApprovalStatus.PendingReview
-      )
+      val result = underTest.buildResponseForApprover(batchChange).left.value
 
-      val asInput = BatchChangeInput(batchChangeNeedsApproval)
-
-      val asAdds = asInput.changes.collect {
-        case a: AddChangeInput => a
-      }
-
-      val transformed = List(
-        AddChangeForValidation(baseZone, singleChangeGood.inputName.split('.').head, asAdds.head).validNel,
-        AddChangeForValidation(baseZone, singleChangeNR.inputName.split('.').head, asAdds(1)).validNel
-      )
-
-      val result = underTest.getApprovalResult(batchChange, transformed).left.value
-
-      result shouldBe an[InvalidBatchChangeResponses]
+      result shouldBe an[BatchChangeFailedApproval]
     }
     "return UnknownConversionError if batch change has an approval status other than" +
       "ManuallyApproved or PendingReview" in {
@@ -2357,18 +2311,7 @@ class BatchChangeServiceSpec
           approvalStatus = BatchChangeApprovalStatus.AutoApproved
         )
 
-      val asInput = BatchChangeInput(batchChange)
-
-      val asAdds = asInput.changes.collect {
-        case a: AddChangeInput => a
-      }
-
-      val transformed = List(
-        AddChangeForValidation(baseZone, singleChangeGood.inputName.split('.').head, asAdds.head).validNel,
-        AddChangeForValidation(baseZone, singleChangeNR.inputName.split('.').head, asAdds(1)).validNel
-      )
-
-      val result = underTest.getApprovalResult(batchChange, transformed).left.value
+      val result = underTest.buildResponseForApprover(batchChange).left.value
 
       result shouldBe an[UnknownConversionError]
     }
