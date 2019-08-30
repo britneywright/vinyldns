@@ -128,7 +128,7 @@ class BatchChangeValidations(
       authPrincipal: AuthPrincipal,
       isTestChange: Boolean): Either[BatchChangeErrorResponse, Unit] =
     validateAuthorizedReviewer(authPrincipal, batchChange, isTestChange) |+| validateBatchChangePendingReview(
-      batchChange) |+| validateScheduledApproval(batchChange)
+      batchChange)
 
   def validateBatchChangeCancellation(
       batchChange: BatchChange,

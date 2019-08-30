@@ -36,6 +36,12 @@ final case class InvalidBatchChangeResponses(
 final case class BatchChangeFailedApproval(changes: List[SingleChange])
     extends BatchChangeErrorResponse
 
+final case class ScheduledChangeReValidationError(
+    changes: List[SingleChange],
+    message: String =
+      s"Cannot process scheduled change as it is not past the scheduled date and time")
+    extends BatchChangeErrorResponse
+
 final case class BatchChangeNotFound(id: String) extends BatchChangeErrorResponse {
   def message: String = s"Batch change with id $id cannot be found"
 }

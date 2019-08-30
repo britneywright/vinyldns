@@ -451,8 +451,8 @@ class BatchChangeService(
             existing.updateValidationErrors(errors.map(e => SingleChangeError(e)).toList)
         }
     }
-
-    if (transformed.forall(_.isValid)) {
+    val scheduledTimePastOrNoTime = existingBatchChange.scheduledTime.forall(t => t.isBeforeNow)
+    if (transformed.forall(_.isValid) && scheduledTimePastOrNoTime) {
       existingBatchChange
         .copy(
           changes = changes,
@@ -497,6 +497,8 @@ class BatchChangeService(
       batchChange: BatchChange): Either[BatchChangeErrorResponse, BatchChange] =
     batchChange.approvalStatus match {
       case ManuallyApproved => batchChange.asRight
+      case _ if batchChange.scheduledTime.exists(t => t.isAfterNow) =>
+        ScheduledChangeReValidationError(batchChange.changes).asLeft
       case _ => BatchChangeFailedApproval(batchChange.changes).asLeft
     }
 

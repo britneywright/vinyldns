@@ -87,8 +87,13 @@
                                    $scope.batch.changes[i].outstandingErrors = false
                                 }
                             }
-                            var errorAlert = {data: "Issues still remain, cannot approve DNS Change. Resolve all outstanding issues or reject the DNS Change.", status: error.status}
-                            handleError(errorAlert, 'batchChangesService::approveBatchChange-failure');
+                            if (error.data.message) {
+                                var errorAlert = {data: error.data.message, status: error.status}
+                                handleError(errorAlert, 'batchChangesService::approveBatchChange-failure');
+                            } else {
+                                var errorAlert = {data: "Issues still remain, cannot approve DNS Change. Resolve all outstanding issues or reject the DNS Change.", status: error.status}
+                                handleError(errorAlert, 'batchChangesService::approveBatchChange-failure');
+                            }
                         } else {
                             handleError(error, 'batchChangesService::approveBatchChange-failure');
                         }
