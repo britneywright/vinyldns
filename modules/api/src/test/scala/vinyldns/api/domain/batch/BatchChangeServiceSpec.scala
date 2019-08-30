@@ -2299,7 +2299,7 @@ class BatchChangeServiceSpec
 
       result shouldBe an[BatchChangeFailedApproval]
     }
-    "return UnknownConversionError if batch change has an approval status other than" +
+    "return InvalidBatchChangeResponses if batch change has an approval status other than" +
       "ManuallyApproved or PendingReview" in {
       val batchChange =
         BatchChange(
@@ -2313,7 +2313,7 @@ class BatchChangeServiceSpec
 
       val result = underTest.buildResponseForApprover(batchChange).left.value
 
-      result shouldBe an[UnknownConversionError]
+      result shouldBe an[BatchChangeFailedApproval]
     }
   }
 }
