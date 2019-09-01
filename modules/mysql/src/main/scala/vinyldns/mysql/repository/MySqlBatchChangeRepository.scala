@@ -378,6 +378,19 @@ class MySqlBatchChangeRepository
     }
 
     PUT_SINGLE_CHANGE.batchByName(singleChangesParams: _*).apply()
+
+    //delete single changes that are no longer in the batch change
+    val idList = batchChange.changes.map(_.id)
+    sql"""
+         |DELETE
+         |  FROM single_change
+         | WHERE id
+         |NOT IN ($idList)
+         |   AND batch_change_id = ${batchChange.id}
+          """.stripMargin
+      .update()
+      .apply()
+
     batchChange
   }
 

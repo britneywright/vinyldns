@@ -62,6 +62,11 @@ trait BatchChangeValidationsAlgebra {
       authPrincipal: AuthPrincipal,
       isTestChange: Boolean): Either[BatchChangeErrorResponse, Unit]
 
+  def validatePendingBatchChangeEdit(
+      batchChange: BatchChange,
+      authPrincipal: AuthPrincipal,
+      isTestChange: Boolean): Either[BatchChangeErrorResponse, Unit]
+
   def validateBatchChangeCancellation(
       batchChange: BatchChange,
       authPrincipal: AuthPrincipal): Either[BatchChangeErrorResponse, Unit]
@@ -121,27 +126,37 @@ class BatchChangeValidations(
       authPrincipal: AuthPrincipal,
       bypassTestValidation: Boolean): Either[BatchChangeErrorResponse, Unit] =
     validateAuthorizedReviewer(authPrincipal, batchChange, bypassTestValidation) |+| validateBatchChangePendingReview(
-      batchChange)
+      batchChange,
+      "rejected")
 
   def validateBatchChangeApproval(
       batchChange: BatchChange,
       authPrincipal: AuthPrincipal,
       isTestChange: Boolean): Either[BatchChangeErrorResponse, Unit] =
     validateAuthorizedReviewer(authPrincipal, batchChange, isTestChange) |+| validateBatchChangePendingReview(
-      batchChange)
+      batchChange,
+      "approved")
+
+  def validatePendingBatchChangeEdit(
+      batchChange: BatchChange,
+      authPrincipal: AuthPrincipal,
+      isTestChange: Boolean): Either[BatchChangeErrorResponse, Unit] =
+    validateBatchChangePendingReview(batchChange, "edited") |+|
+      validateAuthorizedEditor(authPrincipal, batchChange, isTestChange)
 
   def validateBatchChangeCancellation(
       batchChange: BatchChange,
       authPrincipal: AuthPrincipal): Either[BatchChangeErrorResponse, Unit] =
-    validateBatchChangePendingReview(batchChange) |+| validateCreatorCancellation(
+    validateBatchChangePendingReview(batchChange, "cancelled") |+| validateCreatorCancellation(
       batchChange,
       authPrincipal)
 
   def validateBatchChangePendingReview(
-      batchChange: BatchChange): Either[BatchChangeErrorResponse, Unit] =
+      batchChange: BatchChange,
+      action: String): Either[BatchChangeErrorResponse, Unit] =
     batchChange.approvalStatus match {
       case BatchChangeApprovalStatus.PendingReview => ().asRight
-      case _ => BatchChangeNotPendingReview(batchChange.id).asLeft
+      case _ => BatchChangeNotPendingReview(batchChange.id, action).asLeft
     }
 
   def validateAuthorizedReviewer(
@@ -154,6 +169,18 @@ class BatchChangeValidations(
     } else {
       UserNotAuthorizedError(batchChange.id).asLeft
     }
+
+
+  def validateAuthorizedEditor(
+      auth: AuthPrincipal,
+      batchChange: BatchChange,
+      bypassTestValidation: Boolean): Either[BatchChangeErrorResponse, Unit] =
+    if (batchChange.userId == auth.userId || (auth.isSystemAdmin && (bypassTestValidation || !auth.isTestUser))) {
+      ().asRight
+    } else {
+      UserNotAuthorizedError(batchChange.id).asLeft
+    }
+
 
   def validateScheduledApproval(batchChange: BatchChange): Either[BatchChangeErrorResponse, Unit] =
     batchChange.scheduledTime match {

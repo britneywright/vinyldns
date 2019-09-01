@@ -171,6 +171,35 @@ class BatchChangeService(
       response <- buildResponseForApprover(changeForConversion).toBatchResult
     } yield response
 
+  def editBatchChange(
+      batchChangeId: String,
+      batchChangeInput: BatchChangeInput,
+      authPrincipal: AuthPrincipal
+  ): BatchResult[BatchChange] =
+    for {
+      batchChange <- getExistingBatchChange(batchChangeId)
+      requesterAuth <- EitherT.fromOptionF(
+        authProvider.getAuthPrincipalByUserId(batchChange.userId),
+        BatchRequesterNotFound(batchChange.userId, batchChange.userName)
+      )
+      _ <- validatePendingBatchChangeEdit(batchChange, authPrincipal, requesterAuth.isTestUser).toBatchResult
+      validationOutput <- applyBatchChangeValidationFlow(
+        batchChangeInput,
+        authPrincipal,
+        isApproved = false)
+      changeForConversion <- buildResponseForEdit(
+        batchChangeInput,
+        validationOutput.validatedChanges,
+        batchChange,
+        allowManualReview = true
+      ).toBatchResult
+      serviceCompleteBatch <- convertOrSave(
+        changeForConversion,
+        validationOutput.existingZones,
+        validationOutput.existingRecordSets,
+        batchChangeInput.ownerGroupId)
+    } yield serviceCompleteBatch
+
   def cancelBatchChange(
       batchChangeId: String,
       authPrincipal: AuthPrincipal): BatchResult[BatchChange] =
@@ -501,6 +530,87 @@ class BatchChangeService(
         ScheduledChangeReValidationError(batchChange.changes).asLeft
       case _ => BatchChangeFailedApproval(batchChange.changes).asLeft
     }
+
+  def buildResponseForEdit(
+      batchChangeInput: BatchChangeInput,
+      transformed: ValidatedBatch[ChangeForValidation],
+      existingBatchChange: BatchChange,
+      allowManualReview: Boolean = true): Either[BatchChangeErrorResponse, BatchChange] = {
+
+    // Respond with a fatal error that kicks the change out to the user
+    def errorResponse =
+      InvalidBatchChangeResponses(batchChangeInput.changes, transformed).asLeft
+
+    def manualReviewResponse = {
+      val changes = transformed.zip(batchChangeInput.changes).map {
+        case (validated, input) =>
+          validated match {
+            case Valid(v) => v.asStoredChange(v.inputChange.id)
+            case Invalid(errors) =>
+              val existingChange =
+                input.id.flatMap(id => existingBatchChange.changes.find(_.id == id))
+              existingChange match {
+                case Some(ec) =>
+                  ec.updateValidationErrors(errors.map(e => SingleChangeError(e)).toList)
+                case None => input.asNewStoredChange(errors)
+              }
+          }
+      }
+
+      existingBatchChange
+        .copy(
+          comments = batchChangeInput.comments,
+          changes = changes,
+          ownerGroupId = batchChangeInput.ownerGroupId,
+          scheduledTime = batchChangeInput.scheduledTime
+        )
+        .asRight
+    }
+
+    def processNowResponse = {
+      val changes = transformed.getValid.map(_.asStoredChange())
+      existingBatchChange
+        .copy(
+          comments = batchChangeInput.comments,
+          changes = changes,
+          ownerGroupId = batchChangeInput.ownerGroupId,
+          scheduledTime = batchChangeInput.scheduledTime,
+          approvalStatus = BatchChangeApprovalStatus.AutoApproved
+        )
+        .asRight
+    }
+
+    val allErrors = transformed
+      .collect {
+        case Invalid(e) => e
+      }
+      .flatMap(_.toList)
+
+    // Tells us that we have soft errors, and no errors are hard errors
+    val hardErrorsPresent = allErrors.exists(_.isFatal)
+    val noErrors = allErrors.isEmpty
+    val isScheduled = batchChangeInput.scheduledTime.isDefined && this.scheduledChangesEnabled
+
+    if (hardErrorsPresent) {
+      // Always error out
+      errorResponse
+    } else if (noErrors && !isScheduled) {
+      // There are no errors and this is not scheduled, so process immediately
+      processNowResponse
+    } else if (this.manualReviewEnabled && allowManualReview) {
+      if ((noErrors && isScheduled) || batchChangeInput.ownerGroupId.isDefined) {
+        // There are no errors and this is scheduled
+        // or we have soft errors and owner group is defined
+        // advance to manual review if manual review is ok
+        manualReviewResponse
+      } else {
+        ManualReviewRequiresOwnerGroup.asLeft
+      }
+    } else {
+      // Cannot go to manual review, and we have soft errors, so just return a failure
+      errorResponse
+    }
+  }
 
   def addOwnerGroupNamesToSummaries(
       summaries: List[BatchChangeSummary],
