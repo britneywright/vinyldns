@@ -141,8 +141,10 @@ class BatchChangeValidations(
       batchChange: BatchChange,
       authPrincipal: AuthPrincipal,
       isTestChange: Boolean): Either[BatchChangeErrorResponse, Unit] =
-    validateBatchChangePendingReview(batchChange, "edited") |+|
-      validateAuthorizedEditor(authPrincipal, batchChange, isTestChange)
+    validateBatchChangePendingReview(batchChange, "edited") |+| validateAuthorizedEditor(
+      batchChange,
+      authPrincipal,
+      isTestChange: Boolean)
 
   def validateBatchChangeCancellation(
       batchChange: BatchChange,
@@ -170,17 +172,15 @@ class BatchChangeValidations(
       UserNotAuthorizedError(batchChange.id).asLeft
     }
 
-
   def validateAuthorizedEditor(
-      auth: AuthPrincipal,
       batchChange: BatchChange,
+      auth: AuthPrincipal,
       bypassTestValidation: Boolean): Either[BatchChangeErrorResponse, Unit] =
-    if (batchChange.userId == auth.userId || (auth.isSystemAdmin && (bypassTestValidation || !auth.isTestUser))) {
+    if (auth.isSystemAdmin || batchChange.userId == auth.userId && (bypassTestValidation || !auth.isTestUser)) {
       ().asRight
     } else {
       UserNotAuthorizedError(batchChange.id).asLeft
     }
-
 
   def validateScheduledApproval(batchChange: BatchChange): Either[BatchChangeErrorResponse, Unit] =
     batchChange.scheduledTime match {
