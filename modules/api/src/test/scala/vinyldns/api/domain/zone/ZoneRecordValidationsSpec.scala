@@ -228,5 +228,10 @@ class ZoneRecordValidationsSpec extends WordSpec with Matchers with ValidatedMat
       zoneDoesNotRequireManualReview(zoneNameList, "foo.bar", "no-dot.foo.bar.") should
         haveInvalid[DomainValidationError](RecordRequiresManualReview("no-dot.foo.bar."))
     }
+
+    "match zone regardless of trailing whitespace without terminating dot" in {
+      zoneDoesNotRequireManualReview(zoneNameList, "foo.bar    ", "no-dot.foo.bar.") should
+        haveInvalid[DomainValidationError](RecordRequiresManualReview("no-dot.foo.bar."))
+    }
   }
 }

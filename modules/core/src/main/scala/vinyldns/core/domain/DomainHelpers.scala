@@ -18,7 +18,7 @@ package vinyldns.core.domain
 
 object DomainHelpers {
 
-  def ensureTrailingDot(str: String): String = if (str.endsWith(".")) str else s"$str."
+  def ensureTrailingDot(str: String): String = if (str.endsWith(".")) str else s"${str.trim}."
 
   def omitTrailingDot(name: String): String =
     if (name.endsWith(".")) {
